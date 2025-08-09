@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>3D Car Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #101820; font-family: Arial, sans-serif; }
+    canvas { display: block; }
+
+    .btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      padding: 10px 15px;
+      border: 2px solid #00fff5;
+      background: transparent;
+      color: #00fff5;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: 0.3s;
+    }
+    .btn:hover {
+      background: #00fff5;
+      color: #101820;
+      transform: scale(1.1);
+    }
+  </style>
+</head>
+<body>
+  <button class="btn" onclick="switchCamera()">Switch Camera</button>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    let scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101820);
+
+    let camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Lights
+    let hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+    hemiLight.position.set(0, 200, 0);
+    scene.add(hemiLight);
+
+    let dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(100, 100, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    // Ground
+    let groundGeo = new THREE.PlaneGeometry(200, 200);
+    let groundMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    let ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Car Model
+    let car, mixer;
+    let loader = new THREE.GLTFLoader();
+    loader.load('https://threejs.org/examples/models/gltf/Ferrari.glb', function(gltf) {
+      car = gltf.scene;
+      car.traverse(function(node) {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+        }
+      });
+      car.scale.set(0.015, 0.015, 0.015);
+      car.position.set(0, 0, 0);
+      scene.add(car);
+    });
+
+    // Camera positions
+    let chaseCam = new THREE.Object3D();
+    let camOffset = new THREE.Vector3(0, 5, -10);
+    let cameraMode = 0; // 0 = chase, 1 = orbit
+    let controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enabled = false;
+
+    function switchCamera() {
+      cameraMode = (cameraMode + 1) % 2;
+      controls.enabled = (cameraMode === 1);
+    }
+
+    // Movement
+    let keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (car) {
+        if (keys['ArrowUp'] || keys['KeyW']) car.position.z -= 0.1;
+        if (keys['ArrowDown'] || keys['KeyS']) car.position.z += 0.1;
+        if (keys['ArrowLeft'] || keys['KeyA']) car.rotation.y += 0.03;
+        if (keys['ArrowRight'] || keys['KeyD']) car.rotation.y -= 0.03;
+
+        if (cameraMode === 0) {
+          let offset = camOffset.clone().applyMatrix4(car.matrixWorld);
+          camera.position.lerp(offset, 0.1);
+          camera.lookAt(car.position);
+        }
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
